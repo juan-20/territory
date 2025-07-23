@@ -1,7 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
-import { DatabaseReader } from "./_generated/server";
+import type { DatabaseReader } from "./_generated/server";
 
 async function validateToken(ctx: { db: DatabaseReader }, token: string) {
   const existingToken = await ctx.db.query("token").first();
