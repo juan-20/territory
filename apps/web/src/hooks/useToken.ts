@@ -67,5 +67,9 @@ export function clearToken() {
  * Set a new token in cookies
  */
 export function setToken(token: string) {
-  document.cookie = `territory-token=${token}; path=/; max-age=31536000` // 1 year
+  // Ensure cookie is set for all paths and secure in production
+  const secure = process.env.NODE_ENV === 'production' ? 'secure;' : ''
+  const sameSite = process.env.NODE_ENV === 'production' ? 'SameSite=Strict;' : ''
+  
+  document.cookie = `territory-token=${token}; path=/; ${secure} ${sameSite} max-age=31536000` // 1 year
 }

@@ -35,13 +35,18 @@ export default function AuthPage() {
       // Initialize token in database first
       await initToken({ token: trimmedToken })
       
-      // Store in cookies
+      // Store in cookies and ensure proper path and domain
       setCookieToken(trimmedToken)
       toast.success('Login realizado com sucesso!')
       
+      // Give the browser time to set the cookie and middleware to recognize it
+      router.refresh() // Refresh to update middleware state
       
-      router.refresh() 
-      router.replace('/territories')
+      // Small delay to ensure cookie is set before navigation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Use replace with shallow: false to ensure full page reload
+      window.location.href = '/territories'
     } catch (err: any) {
       console.error('Authentication error:', err)
       
