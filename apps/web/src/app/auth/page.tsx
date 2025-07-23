@@ -5,12 +5,13 @@ import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { useMutation } from 'convex/react'
+import { useMutation, useQuery } from 'convex/react'
 import { api } from '@territory/backend/convex/_generated/api'
-import { setToken } from '@/hooks/useToken'
+import { setToken as setCookieToken } from '@/hooks/useToken'
 import { toast } from 'sonner'
+
 export default function AuthPage() {
-  const [token, setToken] = useState('')
+  const [tokenInput, setTokenInput] = useState('')
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
@@ -19,7 +20,9 @@ export default function AuthPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!token.trim()) {
+    const trimmedToken = tokenInput.trim()
+    
+    if (!trimmedToken) {
       setError('Por favor, digite o token de acesso')
       toast.error('Token não pode estar vazio')
       return
@@ -29,16 +32,16 @@ export default function AuthPage() {
     setIsLoading(true)
 
     try {
-      const result = await initToken({ token: token.trim() })
-      if (!result) {
-        throw new Error('Token inválido')
-      }
+      // Initialize token in database first
+      await initToken({ token: trimmedToken })
       
-      // Set cookie using the utility function
-      setToken(token.trim())
+      // Store in cookies
+      setCookieToken(trimmedToken)
       toast.success('Login realizado com sucesso!')
-      router.refresh() // Refresh to update middleware state
-      router.push('/territories')
+      
+      
+      router.refresh() 
+      router.replace('/territories')
     } catch (err: any) {
       console.error('Authentication error:', err)
       
@@ -47,7 +50,7 @@ export default function AuthPage() {
       } else if (err?.message) {
         setError(err.message)
       } else {
-        setError('Token inválido. Por favor, tente novamente.')
+        setError('Erro ao validar o token. Por favor, tente novamente.')
       }
       
       toast.error('Falha na autenticação')
@@ -65,9 +68,10 @@ export default function AuthPage() {
             <Input
               type="text"
               placeholder="Digite o token de acesso"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
+              value={tokenInput}
+              onChange={(e) => setTokenInput(e.target.value)}
               className="w-full"
+              autoComplete="off"
             />
           </div>
           {error && (

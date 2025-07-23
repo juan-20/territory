@@ -6,7 +6,7 @@ import type { DatabaseReader } from "./_generated/server";
 async function validateToken(ctx: { db: DatabaseReader }, token: string) {
   const existingToken = await ctx.db.query("token").first();
   if (!existingToken || existingToken.token !== token) {
-    throw new Error("Invalid token");
+    throw new Error("Token inválido. Por favor, verifique e tente novamente.");
   }
   return true;
 }
@@ -26,7 +26,7 @@ export const initializeToken = mutation({
     
     // If token exists, validate it
     if (existingToken.token !== args.token) {
-      throw new Error("Token inválido");
+      throw new Error("Token inválido. Por favor, verifique e tente novamente.");
     }
     
     return true;
