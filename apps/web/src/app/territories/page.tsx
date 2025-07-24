@@ -118,9 +118,22 @@ export default function Territories() {
 
            <Card className="w-full p-6 bg-card">
             <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between">
+              <div className="flex-col md:flex-row md:items-center md:justify-between">
                 <h1 className="text-2xl font-bold">Territórios</h1>
-                <div className="flex gap-2">
+                
+              </div>
+              <div className="relative">
+                <SearchIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Procurar quadras por nome..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9 w-full"
+                />
+              </div>
+
+              <div className="flex-col md:flex-row gap-2">
                   <Button
                     variant={filterByDoneRecently === null ? "secondary" : "outline"}
                     onClick={() => {
@@ -178,17 +191,7 @@ export default function Territories() {
                     )}
                   </Button>
                 </div>
-              </div>
-              <div className="relative">
-                <SearchIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Procurar quadras por nome..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9 w-full"
-                />
-              </div>
+
             </div>
           </Card>
 
