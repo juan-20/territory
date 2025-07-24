@@ -45,14 +45,21 @@ export const validateTokenQuery = query({
 export const getPaginatedTerritories = query({
   args: { 
     paginationOpts: paginationOptsValidator,
-    token: v.string()
+    token: v.string(),
+    filterByDoneRecently: v.optional(v.union(v.boolean(), v.null()))
   },
   handler: async (ctx, args) => {
     await validateToken(ctx, args.token);
-    return await ctx.db.query("territories")
-                        .filter((q) => q.eq(q.field("doneRecently"), false))
-                        .order("asc")
-                        .paginate(args.paginationOpts);
+    let query = ctx.db.query("territories");
+    
+    // Only apply filter if filterByDoneRecently is not null
+    if (args.filterByDoneRecently !== null && args.filterByDoneRecently !== undefined) {
+      query = query.filter((q) => q.eq(q.field("doneRecently"), args.filterByDoneRecently));
+    }
+    
+    return await query
+      .order("asc")
+      .paginate(args.paginationOpts);
   },
 });
 

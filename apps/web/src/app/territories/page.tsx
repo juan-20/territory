@@ -28,23 +28,26 @@ export default function Territories() {
   const token = useToken()
   const [items, setItems] = useState<Territory[]>([])
   const [cursor, setCursor] = useState<string | null>(null)
+  const [filterByDoneRecently, setFilterByDoneRecently] = useState<boolean | null>(null)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [isChangingFilter, setIsChangingFilter] = useState(false)
 
   const territories = useQuery(api.territory.getPaginatedTerritories, 
     token ? {
       paginationOpts: { numItems: pageSize, cursor },
-      token
+      token,
+      filterByDoneRecently
     } : "skip"
   )
 
-  // Update items when new data arrives
   useEffect(() => {
     if (territories?.page) {
       if (cursor === null) {
-        // First load or reset
         setItems(territories.page)
+        setIsChangingFilter(false)
       } else {
-        // Append new items
         setItems(prev => [...prev, ...territories.page])
+        setIsLoadingMore(false)
       }
     }
   }, [territories?.page, cursor])
@@ -115,7 +118,67 @@ export default function Territories() {
 
            <Card className="w-full p-6 bg-card">
             <div className="flex flex-col gap-4">
-              <h1 className="text-2xl font-bold">Territórios</h1>
+              <div className="flex items-center justify-between">
+                <h1 className="text-2xl font-bold">Territórios</h1>
+                <div className="flex gap-2">
+                  <Button
+                    variant={filterByDoneRecently === null ? "secondary" : "outline"}
+                    onClick={() => {
+                      setIsChangingFilter(true)
+                      setFilterByDoneRecently(null)
+                      setCursor(null)
+                      setItems([])
+                    }}
+                    disabled={isChangingFilter}
+                  >{isChangingFilter && filterByDoneRecently === null ? (
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        <span>Carregando...</span>
+                      </div>
+                    ) : (
+                      "Todos"
+                    )}
+                  </Button>
+                  <Button
+                    variant={filterByDoneRecently === true ? "secondary" : "outline"}
+                    onClick={() => {
+                      setIsChangingFilter(true)
+                      setFilterByDoneRecently(true)
+                      setCursor(null)
+                      setItems([])
+                    }}
+                    disabled={isChangingFilter}
+                  >
+                    {isChangingFilter && filterByDoneRecently === true ? (
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        <span>Carregando...</span>
+                      </div>
+                    ) : (
+                      "Feitos Recentemente"
+                    )}
+                  </Button>
+                  <Button
+                    variant={filterByDoneRecently === false ? "secondary" : "outline"}
+                    onClick={() => {
+                      setIsChangingFilter(true)
+                      setFilterByDoneRecently(false)
+                      setCursor(null)
+                      setItems([])
+                    }}
+                    disabled={isChangingFilter}
+                  >
+                    {isChangingFilter && filterByDoneRecently === false ? (
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        <span>Carregando...</span>
+                      </div>
+                    ) : (
+                      "Não Feitos"
+                    )}
+                  </Button>
+                </div>
+              </div>
               <div className="relative">
                 <SearchIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -130,8 +193,32 @@ export default function Territories() {
           </Card>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Loading skeletons */}
+          {(!territories || isLoadingMore) && (
+            <>
+              {[...Array(pageSize)].map((_, index) => (
+                <Card key={`skeleton-${index}`} className="p-6 bg-card border border-border">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <div className="h-6 bg-muted rounded w-1/2 animate-pulse" />
+                      <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
+                    </div>
+                    <div className="h-4 bg-muted rounded w-1/3 animate-pulse" />
+                    <div className="h-4 bg-muted rounded w-full animate-pulse mt-1" />
+                    <div className="h-4 bg-muted rounded w-2/3 animate-pulse" />
+                    <div className="flex items-center justify-between mt-2">
+                      <div className="h-3 bg-muted rounded w-1/4 animate-pulse" />
+                      <div className="h-3 bg-muted rounded w-1/4 animate-pulse" />
+                    </div>
+                    <div className="h-9 bg-muted rounded w-full mt-4 animate-pulse" />
+                  </div>
+                </Card>
+              ))}
+            </>
+          )}
           
-          {displayedTerritories?.map((territory) => (
+          {/* Actual territories */}
+          {territories && displayedTerritories?.map((territory) => (
             <Card
               key={territory._id}
               className="p-6 bg-card cursor-pointer hover:shadow-lg transition-all duration-200 border border-border"
@@ -176,19 +263,30 @@ export default function Territories() {
           ))}
         </div>
 
-        {!search && territories?.continueCursor && (
+        {!search && territories?.continueCursor && territories.page.length >= pageSize && (
           <div className="mt-4 flex justify-center">
             <Button
-              onClick={() => setCursor(territories.continueCursor)}
+              onClick={() => {
+                setIsLoadingMore(true)
+                setCursor(territories.continueCursor)
+              }}
               variant="outline"
               className="w-full md:w-auto mb-4"
+              disabled={isLoadingMore}
             >
-              Ver mais territórios
+              {isLoadingMore ? (
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  Carregando...
+                </div>
+              ) : (
+                'Ver mais territórios'
+              )}
             </Button>
           </div>
         )}
         
-        {displayedTerritories?.length === 0 && (
+        {territories && displayedTerritories?.length === 0 && (
           <Card className="p-6 bg-card text-center">
             <p className="text-muted-foreground">Nenhum território encontrado</p>
           </Card>
