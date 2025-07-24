@@ -5,9 +5,10 @@ export default defineSchema({
   territories: defineTable({
     name: v.string(),
     description: v.string(),
-    done: v.boolean(),
     updatedAt: v.string(),
     region: v.string(),
+    doneRecently: v.boolean(),
+    timesWhereItWasDone: v.optional(v.array(v.string())),
   }).searchIndex("searchIndex", {
     searchField: "name",
     filterFields: ["region"],

@@ -50,7 +50,7 @@ export const getPaginatedTerritories = query({
   handler: async (ctx, args) => {
     await validateToken(ctx, args.token);
     return await ctx.db.query("territories")
-                        .filter((q) => q.eq(q.field("done"), false))
+                        .filter((q) => q.eq(q.field("doneRecently"), false))
                         .order("asc")
                         .paginate(args.paginationOpts);
   },
@@ -81,6 +81,16 @@ export const getById = query({
   },
 });
 
+export const getAll = query({
+  args: {
+    token: v.string()
+  },
+  handler: async (ctx, args) => {
+    await validateToken(ctx, args.token);
+    return await ctx.db.query("territories").collect();
+  },
+});
+
 export const getByRegion = query({
   args: {
     region: v.string(),
@@ -92,23 +102,23 @@ export const getByRegion = query({
   },
 });
 
-export const getDoneTerritories = query({
+export const getdoneRecentlyTerritories = query({
   args: {
     token: v.string()
   },
   handler: async (ctx, args) => {
     await validateToken(ctx, args.token);
-    return await ctx.db.query("territories").filter((q) => q.eq(q.field("done"), true)).collect();
+    return await ctx.db.query("territories").filter((q) => q.eq(q.field("doneRecently"), true)).collect();
   },
 });
 
-export const getUndoneTerritories = query({
+export const getUndoneRecentlyTerritories = query({
   args: {
     token: v.string()
   },
   handler: async (ctx, args) => {
     await validateToken(ctx, args.token);
-    return await ctx.db.query("territories").filter((q) => q.eq(q.field("done"), false)).collect();
+    return await ctx.db.query("territories").filter((q) => q.eq(q.field("doneRecently"), false)).collect();
   }
 });
 
@@ -126,7 +136,7 @@ export const create = mutation({
   args: {
     name: v.string(),
     description: v.string(),
-    done: v.boolean(),
+    doneRecently: v.boolean(),
     region: v.string(),
     token: v.string()
   },
@@ -135,7 +145,7 @@ export const create = mutation({
     const newTerritoryId = await ctx.db.insert("territories", {
       name: args.name,
       description: args.description,
-      done: false,
+      doneRecently: false,
       updatedAt: new Date().toISOString(),
       region: args.region,
     });
@@ -146,14 +156,55 @@ export const create = mutation({
 export const toggle = mutation({
   args: {
     id: v.id("territories"),
-    done: v.boolean(),
     description: v.string(),
     region: v.string(),
-    token: v.string()
+    token: v.string(),
+    timesWhereItWasDone: v.optional(v.string())
   },
   handler: async (ctx, args) => {
     await validateToken(ctx, args.token);
-    await ctx.db.patch(args.id, { done: args.done, updatedAt: new Date().toISOString(), description: args.description, region: args.region });
+
+    // Process and validate dates
+    const processDate = (dateStr: string): string | null => {
+      try {
+        // Handle both date-only strings and full ISO strings
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return null;
+        
+        // Ensure consistent ISO format with time set to noon UTC
+        // This helps prevent timezone issues when comparing dates
+        date.setUTCHours(12, 0, 0, 0);
+        return date.toISOString();
+      } catch {
+        return null;
+      }
+    };
+
+    // Calculate times done from the input, ensuring proper ISO format
+    const timesDone = args.timesWhereItWasDone ? 
+      args.timesWhereItWasDone
+        .split(",")
+        .map(date => processDate(date.trim()))
+        .filter((date): date is string => date !== null)
+        .sort((a, b) => new Date(b).getTime() - new Date(a).getTime()) // Sort newest first
+      : [];
+    
+    // Check if any date is within the last year
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    
+    const doneRecently = timesDone.some(dateStr => {
+      const date = new Date(dateStr);
+      return date >= oneYearAgo;
+    });
+
+    await ctx.db.patch(args.id, { 
+      doneRecently, // Automatically calculated
+      updatedAt: new Date().toISOString(), 
+      description: args.description, 
+      region: args.region, 
+      timesWhereItWasDone: timesDone
+    });
     return { success: true };
   },
 });
@@ -169,3 +220,4 @@ export const deleteTerritory = mutation({
     return { success: true };
   },
 });
+

@@ -36,7 +36,8 @@ export default function EditTerritoryPage({ params }: PageProps) {
   const [formData, setFormData] = useState({
     description: '',
     region: '',
-    done: false
+    timesWhereItWasDone: [] as string[],
+    newDate: new Date().toISOString().split('T')[0] 
   })
 
   useEffect(() => {
@@ -44,7 +45,8 @@ export default function EditTerritoryPage({ params }: PageProps) {
       setFormData({
         description: territory.description,
         region: territory.region,
-        done: territory.done
+        timesWhereItWasDone: territory.timesWhereItWasDone || [],
+        newDate: new Date().toISOString().split('T')[0]
       })
     }
   }, [territory])
@@ -63,10 +65,34 @@ export default function EditTerritoryPage({ params }: PageProps) {
       id,
       description: formData.description,
       region: formData.region,
-      done: formData.done,
-      token: "bdshfvbsdhjfbhjsbjh"
+      token: token,
+      timesWhereItWasDone: formData.timesWhereItWasDone.join(',')
     })
     router.back()
+  }
+
+  const formatDate = (date: string) => {
+    return new Date(date).toISOString().replace(/T.*/,'').split('-').reverse().join('-')
+  }
+
+  const handleAddDate = () => {
+    if (formData.newDate) {
+      const selectedDate = formData.newDate
+      setFormData(prev => ({
+        ...prev,
+        timesWhereItWasDone: [
+          ...prev.timesWhereItWasDone.filter(date => date !== selectedDate),
+          selectedDate
+        ].sort().reverse()
+      }))
+    }
+  }
+
+  const handleRemoveDate = (dateToRemove: string) => {
+    setFormData(prev => ({
+      ...prev,
+      timesWhereItWasDone: prev.timesWhereItWasDone.filter(date => date !== dateToRemove)
+    }))
   }
 
   return (
@@ -79,7 +105,7 @@ export default function EditTerritoryPage({ params }: PageProps) {
           Back
         </Button>
       </div>
-
+      {JSON.stringify(formData)}
       <Card className="p-6 bg-card">
         <h1 className="text-2xl font-bold">Edit Territory: {territory.name}</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -107,15 +133,50 @@ export default function EditTerritoryPage({ params }: PageProps) {
             </select>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="done"
-              checked={formData.done}
-              onCheckedChange={(checked) => 
-                setFormData(prev => ({ ...prev, done: checked === true }))
-              }
-            />
-            <Label htmlFor="done">Mark as completed</Label>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <Label>Dates Completed</Label>
+              {territory && (
+                <div className="flex items-center gap-2">
+                  <div className={`h-2 w-2 rounded-full ${territory.doneRecently ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                  <span className="text-sm text-muted-foreground">
+                    {territory.doneRecently ? 'Feito Recentemente' : 'Não Feito Recentemente'}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Input
+                type="date"
+                value={formData.newDate}
+                onChange={(e) => setFormData(prev => ({ ...prev, newDate: e.target.value }))}
+              />
+              <Button 
+                type="button" 
+                variant="secondary"
+                onClick={handleAddDate}
+              >
+                Add Date
+              </Button>
+            </div>
+            
+            <div className="space-y-2">
+              {formData.timesWhereItWasDone.map((date) => (
+                <div key={date} className="flex items-center justify-between bg-muted p-2 rounded">
+                  <span>{formatDate(date)}</span>
+                  <p>{date}</p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRemoveDate(date)}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="flex justify-end space-x-2">
