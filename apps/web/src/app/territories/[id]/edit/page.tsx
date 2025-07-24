@@ -12,6 +12,8 @@ import type { Id } from '@territory/backend/convex/_generated/dataModel'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useState, useEffect } from 'react'
 import { useToken } from '@/hooks/useToken'
+import { DatePicker } from '@/components/ui/date-picker'
+import { Trash } from 'lucide-react'
 
 interface Params {
   id: Id<'territories'>
@@ -37,17 +39,25 @@ export default function EditTerritoryPage({ params }: PageProps) {
     description: '',
     region: '',
     timesWhereItWasDone: [] as string[],
-    newDate: new Date().toISOString().split('T')[0] 
+    newDate: ''
   })
 
   useEffect(() => {
+    // Set the initial date when component mounts on client
+    setFormData(prev => ({
+      ...prev,
+      newDate: new Date().toISOString().split('T')[0]
+    }))
+  }, [])
+
+  useEffect(() => {
     if (territory) {
-      setFormData({
+      setFormData(prev => ({
         description: territory.description,
         region: territory.region,
         timesWhereItWasDone: territory.timesWhereItWasDone || [],
-        newDate: new Date().toISOString().split('T')[0]
-      })
+        newDate: prev.newDate // Preserve the current date
+      }))
     }
   }, [territory])
 
@@ -102,15 +112,14 @@ export default function EditTerritoryPage({ params }: PageProps) {
           variant="outline"
           onClick={() => router.back()}
         >
-          Back
+          Voltar
         </Button>
       </div>
-      {JSON.stringify(formData)}
       <Card className="p-6 bg-card">
-        <h1 className="text-2xl font-bold">Edit Territory: {territory.name}</h1>
+        <h1 className="text-2xl font-bold">Editar território: {territory.name}</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label>Description</Label>
+            <Label>Descrição</Label>
             <Input
               value={formData.description}
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
@@ -119,7 +128,7 @@ export default function EditTerritoryPage({ params }: PageProps) {
           </div>
 
           <div>
-            <Label>Region</Label>
+            <Label>Região</Label>
             <select
               value={formData.region}
               onChange={(e) => setFormData(prev => ({ ...prev, region: e.target.value }))}
@@ -135,7 +144,7 @@ export default function EditTerritoryPage({ params }: PageProps) {
 
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <Label>Dates Completed</Label>
+              <Label>Datas pregadas</Label>
               {territory && (
                 <div className="flex items-center gap-2">
                   <div className={`h-2 w-2 rounded-full ${territory.doneRecently ? 'bg-green-500' : 'bg-yellow-500'}`} />
@@ -146,17 +155,23 @@ export default function EditTerritoryPage({ params }: PageProps) {
               )}
             </div>
             <div className="flex gap-2">
-              <Input
-                type="date"
-                value={formData.newDate}
-                onChange={(e) => setFormData(prev => ({ ...prev, newDate: e.target.value }))}
-              />
+              <div className="flex-1">
+                <DatePicker
+                  date={new Date(formData.newDate + 'T12:00:00')}
+                  setDate={(date) => {
+                    if (date) {
+                      const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000))
+                      setFormData(prev => ({ ...prev, newDate: localDate.toISOString().split('T')[0] }))
+                    }
+                  }}
+                />
+              </div>
               <Button 
                 type="button" 
                 variant="secondary"
                 onClick={handleAddDate}
               >
-                Add Date
+                Adicionar Data
               </Button>
             </div>
             
@@ -164,15 +179,14 @@ export default function EditTerritoryPage({ params }: PageProps) {
               {formData.timesWhereItWasDone.map((date) => (
                 <div key={date} className="flex items-center justify-between bg-muted p-2 rounded">
                   <span>{formatDate(date)}</span>
-                  <p>{date}</p>
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="destructive"
                     size="sm"
                     onClick={() => handleRemoveDate(date)}
-                    className="text-destructive hover:text-destructive"
+                    className="text-red-500 hover:text-red-600 cursor-pointer"
                   >
-                    Remove
+                    <Trash />
                   </Button>
                 </div>
               ))}
@@ -181,7 +195,7 @@ export default function EditTerritoryPage({ params }: PageProps) {
 
           <div className="flex justify-end space-x-2">
             <Button type="submit">
-              Save Changes
+              Salvar Alterações
             </Button>
           </div>
         </form>

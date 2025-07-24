@@ -164,15 +164,11 @@ export const toggle = mutation({
   handler: async (ctx, args) => {
     await validateToken(ctx, args.token);
 
-    // Process and validate dates
     const processDate = (dateStr: string): string | null => {
       try {
-        // Handle both date-only strings and full ISO strings
         const date = new Date(dateStr);
         if (isNaN(date.getTime())) return null;
         
-        // Ensure consistent ISO format with time set to noon UTC
-        // This helps prevent timezone issues when comparing dates
         date.setUTCHours(12, 0, 0, 0);
         return date.toISOString();
       } catch {
@@ -180,16 +176,14 @@ export const toggle = mutation({
       }
     };
 
-    // Calculate times done from the input, ensuring proper ISO format
     const timesDone = args.timesWhereItWasDone ? 
       args.timesWhereItWasDone
         .split(",")
         .map(date => processDate(date.trim()))
         .filter((date): date is string => date !== null)
-        .sort((a, b) => new Date(b).getTime() - new Date(a).getTime()) // Sort newest first
+        .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
       : [];
     
-    // Check if any date is within the last year
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
     
@@ -221,3 +215,34 @@ export const deleteTerritory = mutation({
   },
 });
 
+export const doneTerritories = query({
+  args: {
+    token: v.string()
+  },
+  handler: async (ctx, args) => {
+    await validateToken(ctx, args.token);
+    // Count all territories
+    const territories = await ctx.db.query("territories").collect();
+    const totalCount = territories.length;
+    // Count territories done in the last year
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    const doneRecentlyCount = territories.filter(territory => {
+      const lastDoneDate = territory.timesWhereItWasDone?.[0];
+      if (!lastDoneDate) return false;
+      const date = new Date(lastDoneDate);
+      return date >= oneYearAgo;
+    }).length;
+    return { "totalCount": totalCount, "doneRecentlyCount": doneRecentlyCount };
+  },
+});
+
+export const updateDoneTerritories = mutation({
+  args: {
+    token: v.string()
+  },
+  handler: async (ctx, args) => {
+    await validateToken(ctx, args.token);
+    // Update logic here
+  },
+});
