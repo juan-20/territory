@@ -9,6 +9,7 @@ export default defineSchema({
     region: v.string(),
     doneRecently: v.boolean(),
     timesWhereItWasDone: v.optional(v.array(v.string())),
+    leastEditedBy: v.optional(v.array(v.string())),
   }).searchIndex("searchIndex", {
     searchField: "name",
     filterFields: ["region"],
@@ -16,5 +17,7 @@ export default defineSchema({
 
   token: defineTable({
     token: v.string(),
+    username: v.string(),
+    role: v.string(),
   }),
 });

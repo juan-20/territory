@@ -13,9 +13,6 @@ import type {
   FilterApi,
   FunctionReference,
 } from "convex/server";
-import type * as auth from "../auth.js";
-import type * as healthCheck from "../healthCheck.js";
-import type * as territory from "../territory.js";
 
 /**
  * A utility for referencing Convex functions in your app's API.
@@ -25,11 +22,7 @@ import type * as territory from "../territory.js";
  * const myFunctionReference = api.myModule.myFunction;
  * ```
  */
-declare const fullApi: ApiFromModules<{
-  auth: typeof auth;
-  healthCheck: typeof healthCheck;
-  territory: typeof territory;
-}>;
+declare const fullApi: ApiFromModules<{}>;
 export declare const api: FilterApi<
   typeof fullApi,
   FunctionReference<any, "public">

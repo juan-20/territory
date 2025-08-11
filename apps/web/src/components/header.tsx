@@ -4,19 +4,23 @@ import { useRouter } from "next/navigation";
 import { Button } from "./ui/button";
 import { ModeToggle } from "./mode-toggle";
 import { clearToken } from "@/hooks/useToken";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { toast } from "sonner";
 
 export default function Header() {
   const router = useRouter();
+  const { isAdmin, userInfo } = useIsAdmin();
+  
   const links = [
     { to: "/", label: "Home" },
     { to: "/territories", label: "Quadras" },
+    ...(isAdmin ? [{ to: "/admin", label: "Admin" }] : []),
   ];
 
   const handleLogout = () => {
     clearToken();
     toast.success("Sessão encerrada");
-    router.refresh(); // Ensure middleware sees the token is gone
+    router.refresh();
     router.push("/auth");
   };
 
@@ -33,13 +37,21 @@ export default function Header() {
           })}
         </nav>
         <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleLogout}
-          >
-            Sair
-          </Button>
+          {userInfo && (
+            <>
+            <span className="text-sm text-muted-foreground">
+              Olá, {userInfo.username}
+            </span><Button
+              variant="destructive"
+              size="sm"
+              onClick={handleLogout}
+            >
+                <span className="text-sm text-muted-foreground">
+                  Sair
+                </span>
+              </Button>
+            </>
+          )}
           <ModeToggle />
         </div>
       </div>

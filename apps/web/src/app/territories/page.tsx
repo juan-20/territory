@@ -9,7 +9,8 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { api } from '@territory/backend/convex/_generated/api'
 import { useToken } from '@/hooks/useToken'
-import { SearchIcon } from 'lucide-react'
+import { useIsAdmin } from '@/hooks/useIsAdmin'
+import { SearchIcon, UserIcon } from 'lucide-react'
 
 interface Territory {
   _id: string
@@ -19,6 +20,7 @@ interface Territory {
   updatedAt: string
   region: string
   timesWhereItWasDone?: string[]
+  leastEditedBy?: string[]
 }
 
 export default function Territories() {
@@ -26,6 +28,7 @@ export default function Territories() {
   const [search, setSearch] = useState('')
   const pageSize = 9
   const token = useToken()
+  const { isAdmin } = useIsAdmin()
   const [items, setItems] = useState<Territory[]>([])
   const [cursor, setCursor] = useState<string | null>(null)
   const [filterByDoneRecently, setFilterByDoneRecently] = useState<boolean | null>(null)
@@ -74,7 +77,7 @@ export default function Territories() {
   }
 
   return (
-    <div className="container mx-auto p-4 min-h-screen">
+    <div className="container mx-auto p-4">
       <div className="flex flex-col gap-6">
         <div className="flex flex-col md:flex-row gap-4">
          
@@ -240,6 +243,19 @@ export default function Territories() {
                   <p className="text-xs text-muted-foreground mt-2">
                     Pregado pela última vez: {new Date(territory.timesWhereItWasDone[0]).toLocaleDateString('pt-BR')}
                   </p>
+                )}
+                {territory.leastEditedBy && territory.leastEditedBy.length > 0 && (
+                  <div className="flex items-center gap-1 mt-1">
+                    <UserIcon className="h-3 w-3 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground">
+                      Editado por: {territory.leastEditedBy[0]}
+                      {territory.leastEditedBy.length > 1 && (
+                        <span className="ml-1 px-1 py-0.5 bg-muted rounded text-xs">
+                          +{territory.leastEditedBy.length - 1}
+                        </span>
+                      )}
+                    </p>
+                  </div>
                 )}
               </div>
               <div className="flex items-center justify-between mt-2">

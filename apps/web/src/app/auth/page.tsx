@@ -15,7 +15,8 @@ export default function AuthPage() {
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
-  const initToken = useMutation(api.territory.initializeToken)
+  
+  const loginWithToken = useMutation(api.auth.loginWithToken)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -32,33 +33,31 @@ export default function AuthPage() {
     setIsLoading(true)
 
     try {
-      // Initialize token in database first
-      await initToken({ token: trimmedToken })
       
-      // Store in cookies and ensure proper path and domain
+      const result = await loginWithToken({ token: trimmedToken })
+      
+      
       setCookieToken(trimmedToken)
-      toast.success('Login realizado com sucesso!')
       
-      // Give the browser time to set the cookie and middleware to recognize it
-      router.refresh() // Refresh to update middleware state
+      if (result.isFirstUser) {
+        toast.success(`Bem-vindo! Você é o primeiro administrador do sistema.`)
+      } else {
+        toast.success(`Bem-vindo, ${result.user.username}!`)
+      }
+      router.refresh()
+      router.push('/territories')
       
-      // Small delay to ensure cookie is set before navigation
-      await new Promise(resolve => setTimeout(resolve, 100))
       
-      // Use replace with shallow: false to ensure full page reload
-      window.location.href = '/territories'
     } catch (err: any) {
       console.error('Authentication error:', err)
       
-      if (err?.data?.message) {
-        setError(err.data.message)
-      } else if (err?.message) {
+      if (err?.message) {
         setError(err.message)
+        toast.error(err.message)
       } else {
         setError('Erro ao validar o token. Por favor, tente novamente.')
+        toast.error('Falha na autenticação')
       }
-      
-      toast.error('Falha na autenticação')
     } finally {
       setIsLoading(false)
     }
@@ -68,11 +67,14 @@ export default function AuthPage() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <Card className="w-full max-w-md p-6">
         <h1 className="text-2xl font-bold mb-6 text-center">Autenticação</h1>
+        <p className="text-sm text-muted-foreground mb-4 text-center">
+          Digite seu token de acesso
+        </p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Input
               type="text"
-              placeholder="Digite o token de acesso"
+              placeholder="Digite seu token de acesso"
               value={tokenInput}
               onChange={(e) => setTokenInput(e.target.value)}
               className="w-full"
@@ -90,6 +92,10 @@ export default function AuthPage() {
             {isLoading ? 'Verificando...' : 'Entrar'}
           </Button>
         </form>
+        <div className="mt-4 text-xs text-muted-foreground text-center space-y-1">
+          <p>• Se é a primeira vez, qualquer token criará o administrador inicial</p>
+          <p>• Se já existem usuários, use o token fornecido pelo administrador</p>
+        </div>
       </Card>
     </div>
   )

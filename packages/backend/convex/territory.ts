@@ -1,46 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
-import type { DatabaseReader } from "./_generated/server";
-
-async function validateToken(ctx: { db: DatabaseReader }, token: string) {
-  const existingToken = await ctx.db.query("token").first();
-  if (!existingToken || existingToken.token !== token) {
-    throw new Error("Token inválido. Por favor, verifique e tente novamente.");
-  }
-  return true;
-}
-
-export const initializeToken = mutation({
-  args: {
-    token: v.string()
-  },
-  handler: async (ctx, args) => {
-    const existingToken = await ctx.db.query("token").first();
-    
-    // If no token exists yet, create it
-    if (!existingToken) {
-      await ctx.db.insert("token", { token: args.token });
-      return true;
-    }
-    
-    // If token exists, validate it
-    if (existingToken.token !== args.token) {
-      throw new Error("Token inválido. Por favor, verifique e tente novamente.");
-    }
-    
-    return true;
-  },
-});
-
-export const validateTokenQuery = query({
-  args: {
-    token: v.string()
-  },
-  handler: async (ctx, args) => {
-    return await validateToken(ctx, args.token);
-  },
-});
+import { validateToken, validateAdminRole } from "./auth";
 
 export const getPaginatedTerritories = query({
   args: { 
@@ -148,13 +109,14 @@ export const create = mutation({
     token: v.string()
   },
   handler: async (ctx, args) => {
-    await validateToken(ctx, args.token);
+    const tokenData = await validateAdminRole(ctx, args.token);
     const newTerritoryId = await ctx.db.insert("territories", {
       name: args.name,
       description: args.description,
       doneRecently: false,
       updatedAt: new Date().toISOString(),
       region: args.region,
+      leastEditedBy: [tokenData.username] // Track who created the territory as array
     });
     return await ctx.db.get(newTerritoryId);
   },
@@ -169,7 +131,7 @@ export const toggle = mutation({
     timesWhereItWasDone: v.optional(v.string())
   },
   handler: async (ctx, args) => {
-    await validateToken(ctx, args.token);
+    const tokenData = await validateToken(ctx, args.token);
 
     const processDate = (dateStr: string): string | null => {
       try {
@@ -199,12 +161,28 @@ export const toggle = mutation({
       return date >= oneYearAgo;
     });
 
+    // Get current territory to manage editors array
+    const currentTerritory = await ctx.db.get(args.id);
+    const currentEditors = currentTerritory?.leastEditedBy || [];
+    
+    // Add current editor to the beginning of the array if not already the most recent
+    let updatedEditors = [...currentEditors];
+    if (updatedEditors[0] !== tokenData.username) {
+      // Remove user if they exist elsewhere in the array
+      updatedEditors = updatedEditors.filter(editor => editor !== tokenData.username);
+      // Add to the beginning (most recent)
+      updatedEditors.unshift(tokenData.username);
+      // Keep only last 5 editors to prevent infinite growth
+      updatedEditors = updatedEditors.slice(0, 5);
+    }
+
     await ctx.db.patch(args.id, { 
       doneRecently, // Automatically calculated
       updatedAt: new Date().toISOString(), 
       description: args.description, 
       region: args.region, 
-      timesWhereItWasDone: timesDone
+      timesWhereItWasDone: timesDone,
+      leastEditedBy: updatedEditors // Track editors array
     });
     return { success: true };
   },
@@ -216,7 +194,7 @@ export const deleteTerritory = mutation({
     token: v.string()
   },
   handler: async (ctx, args) => {
-    await validateToken(ctx, args.token);
+    await validateAdminRole(ctx, args.token);
     await ctx.db.delete(args.id);
     return { success: true };
   },
@@ -244,6 +222,30 @@ export const doneTerritories = query({
   },
 });
 
+export const getTerritoriesWithEditInfo = query({
+  args: {
+    token: v.string()
+  },
+  handler: async (ctx, args) => {
+    await validateAdminRole(ctx, args.token);
+    
+    const territories = await ctx.db.query("territories").collect();
+    
+    return territories.map(territory => ({
+      _id: territory._id,
+      name: territory.name,
+      description: territory.description,
+      region: territory.region,
+      doneRecently: territory.doneRecently,
+      updatedAt: territory.updatedAt,
+      leastEditedBy: territory.leastEditedBy || [],
+      lastEditor: territory.leastEditedBy?.[0] || null,
+      totalEditors: territory.leastEditedBy?.length || 0,
+      timesWhereItWasDone: territory.timesWhereItWasDone || []
+    }));
+  },
+});
+
 export const updateDoneTerritories = mutation({
   args: {
     token: v.string()
@@ -251,5 +253,95 @@ export const updateDoneTerritories = mutation({
   handler: async (ctx, args) => {
     await validateToken(ctx, args.token);
     // Update logic here
+  },
+});
+
+export const clearLastEditedBy = mutation({
+  args: {
+    id: v.id("territories"),
+    token: v.string()
+  },
+  handler: async (ctx, args) => {
+    await validateAdminRole(ctx, args.token);
+    
+    await ctx.db.patch(args.id, {
+      leastEditedBy: undefined,
+      updatedAt: new Date().toISOString()
+    });
+    
+    return { success: true };
+  },
+});
+
+export const clearSingleEditor = mutation({
+  args: {
+    id: v.id("territories"),
+    editorToRemove: v.string(),
+    token: v.string()
+  },
+  handler: async (ctx, args) => {
+    await validateAdminRole(ctx, args.token);
+    
+    const territory = await ctx.db.get(args.id);
+    if (!territory || !territory.leastEditedBy) {
+      throw new Error("Território não encontrado ou sem editores para remover");
+    }
+    
+    const updatedEditors = territory.leastEditedBy.filter(editor => editor !== args.editorToRemove);
+    
+    await ctx.db.patch(args.id, {
+      leastEditedBy: updatedEditors.length > 0 ? updatedEditors : undefined,
+      updatedAt: new Date().toISOString()
+    });
+    
+    return { success: true };
+  },
+});
+
+export const clearAllLastEditedBy = mutation({
+  args: {
+    token: v.string()
+  },
+  handler: async (ctx, args) => {
+    await validateAdminRole(ctx, args.token);
+    
+    // Get all territories that have leastEditedBy set
+    const territories = await ctx.db.query("territories")
+      .filter((q) => q.neq(q.field("leastEditedBy"), undefined))
+      .collect();
+    
+    // Clear leastEditedBy for all territories
+    for (const territory of territories) {
+      await ctx.db.patch(territory._id, {
+        leastEditedBy: undefined,
+        updatedAt: new Date().toISOString()
+      });
+    }
+    
+    return { 
+      success: true, 
+      clearedCount: territories.length 
+    };
+  },
+});
+
+export const getEditorsHistory = query({
+  args: {
+    id: v.id("territories"),
+    token: v.string()
+  },
+  handler: async (ctx, args) => {
+    await validateToken(ctx, args.token);
+    
+    const territory = await ctx.db.get(args.id);
+    if (!territory) {
+      throw new Error("Território não encontrado");
+    }
+    
+    return {
+      editors: territory.leastEditedBy || [],
+      lastEditor: territory.leastEditedBy?.[0] || null,
+      totalEditors: territory.leastEditedBy?.length || 0
+    };
   },
 });

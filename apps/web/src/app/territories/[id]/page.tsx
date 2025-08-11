@@ -1,13 +1,16 @@
 'use client'
 
 import React from 'react'
-import { useQuery } from 'convex/react'
+import { useQuery, useMutation } from 'convex/react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { redirect, useRouter } from 'next/navigation'
 import { api } from '@territory/backend/convex/_generated/api'
 import type { Id } from '@territory/backend/convex/_generated/dataModel'
 import { useToken } from '@/hooks/useToken'
+import { useIsAdmin } from '@/hooks/useIsAdmin'
+import { UserIcon, Trash2Icon, XIcon } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface Params {
   id: Id<'territories'>
@@ -21,10 +24,15 @@ export default function TerritoryPage({ params }: PageProps) {
   const router = useRouter()
   const { id } = React.use(params)
   const token = useToken()
+  const { isAdmin } = useIsAdmin()
+  
   const territory = useQuery(api.territory.getById, token ? {
     id,
     token
   } : "skip")
+  
+  const clearLastEditedBy = useMutation(api.territory.clearLastEditedBy)
+  const clearSingleEditor = useMutation(api.territory.clearSingleEditor)
 
   if (!token) {
       redirect('/auth')
@@ -36,6 +44,28 @@ export default function TerritoryPage({ params }: PageProps) {
 
   const formatDate = (date: string) => {
     return new Date(date).toISOString().replace(/T.*/,'').split('-').reverse().join('-')
+  }
+
+  const handleClearLastEditedBy = async () => {
+    if (!token) return
+    
+    try {
+      await clearLastEditedBy({ id, token })
+      toast.success('Informação de edição removida com sucesso!')
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao remover informação de edição')
+    }
+  }
+
+  const handleClearSingleEditor = async (editorToRemove: string) => {
+    if (!token) return
+    
+    try {
+      await clearSingleEditor({ id, editorToRemove, token })
+      toast.success(`Editor ${editorToRemove} removido com sucesso!`)
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao remover editor')
+    }
   }
 
   return (
@@ -93,6 +123,54 @@ export default function TerritoryPage({ params }: PageProps) {
               )}
             </div>
           </div>
+          
+          {/* Edit tracking information */}
+          {territory.leastEditedBy && territory.leastEditedBy.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Histórico de Edições</h2>
+                {isAdmin && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleClearLastEditedBy}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    <Trash2Icon className="h-3 w-3 mr-1" />
+                    Limpar Tudo
+                  </Button>
+                )}
+              </div>
+              <div className="space-y-2 mt-2">
+                {territory.leastEditedBy.map((editor, index) => (
+                  <div key={`${editor}-${index}`} className="flex items-center justify-between bg-muted p-2 rounded">
+                    <div className="flex items-center gap-2">
+                      <UserIcon className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">{editor}</span>
+                      {index === 0 && (
+                        <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded">
+                          Mais recente
+                        </span>
+                      )}
+                    </div>
+                    {isAdmin && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleClearSingleEditor(editor)}
+                        className="text-red-600 hover:text-red-700 p-1 h-auto"
+                      >
+                        <XIcon className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <span className="text-xs text-muted-foreground block mt-2">
+                Atualizado em: {new Date(territory.updatedAt).toLocaleString('pt-BR')}
+              </span>
+            </div>
+          )}
         </div>
       </Card>
     </div>
